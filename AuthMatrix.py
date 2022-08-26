@@ -179,6 +179,18 @@ class BurpExtender(IBurpExtender, ITab, IMessageEditorController, IContextMenuFa
                     selfExtender._selectedColumn = -1
                     # Redrawing the table happens in colorcode within the thread
 
+        class actionRunMessageOnly(ActionListener):
+            def actionPerformed(self,e):
+                if selfExtender._selectedRow >= 0:
+                    if selfExtender._selectedRow not in selfExtender._messageTable.getSelectedRows():
+                        indexes = [selfExtender._db.getMessageByRow(selfExtender._selectedRow)._index]
+                    else:
+                        indexes = [selfExtender._db.getMessageByRow(rowNum)._index for rowNum in selfExtender._messageTable.getSelectedRows()]
+                    t = Thread(target=selfExtender.runMessagesThread, args = [indexes])
+                    t.start()
+                    selfExtender._selectedColumn = -1
+               
+
         class actionToggleEnableUser(ActionListener):
             def actionPerformed(self,e):
                 if selfExtender._selectedRow >= 0:
@@ -369,6 +381,8 @@ class BurpExtender(IBurpExtender, ITab, IMessageEditorController, IContextMenuFa
                     selfExtender._selectedColumn = -1
                     selfExtender._messageTable.redrawTable()
 
+
+
         # Message Table popups
         messagePopup = JPopupMenu()
         addPopup(self._messageTable,messagePopup)
@@ -378,6 +392,11 @@ class BurpExtender(IBurpExtender, ITab, IMessageEditorController, IContextMenuFa
         messageRun = JMenuItem("Run Request(s)")
         messageRun.addActionListener(actionRunMessage())
         messagePopup.add(messageRun)
+
+        _messageRun = JMenuItem("Run Request Only")
+        _messageRun.addActionListener(actionRunMessageOnly())
+        messagePopup.add(_messageRun)
+
         toggleRegex = JMenuItem("Toggle Regex Mode (Success/Failure)")
         toggleRegex.addActionListener(actionToggleRegex())
         messagePopup.add(toggleRegex)
@@ -926,6 +945,7 @@ class BurpExtender(IBurpExtender, ITab, IMessageEditorController, IContextMenuFa
             self.clearColorResults(indexes)
             # Run in order of row, not by index
             messagesThatHaveRun = []
+
             for message in self._db.getMessagesInOrderByRow():
                 # Only run if message is in the selected indexes (NOTE: dependencies will be run even if not selected)
                 if message._index in indexes:
